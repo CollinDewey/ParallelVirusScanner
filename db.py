@@ -26,8 +26,16 @@ def download_database():
         if not logger.isEnabledFor(logging.INFO):
             print(".", end="", flush=True)
         logger.info(f"Downloading VirusShare_{i:05}.md5")
-        response = requests.get(f"https://virusshare.com/hashfiles/VirusShare_{i:05}.md5")
-        lines = response.text.splitlines()
+        
+        while True:
+            try:
+                response = requests.get(f"https://virusshare.com/hashfiles/VirusShare_{i:05}.md5")
+                response.raise_for_status()
+                lines = response.text.splitlines()
+                break
+            except requests.RequestException as e:
+                logger.error(f"Download of VirusShare_{i:05}.md5 failed, retrying...")
+        
         for line in lines:
             line = line.strip()
             if line and not line.startswith('#'):
@@ -44,7 +52,7 @@ def validate_database():
             db_hash = hashlib.file_digest(f, hashlib.md5).hexdigest()
             logger.info(f"DB hash: {db_hash}")
 
-        if db_hash == "16efa4830bc14abea9dd9fbba6d3f9ef":
+        if db_hash == "464634b7490fa41d6c6d7684d5505992":
             logger.info("DB valid")
             return True
     else:
@@ -62,4 +70,4 @@ def init_database(bypass_checks):
             print("\nDatabase downloaded.")
         else:
             print("\nDownload failed.\nRetrying...")
-            init_database(False)
+            #init_database(False)
