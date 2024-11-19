@@ -54,14 +54,18 @@ if __name__ == '__main__':
         logger.error("Invalid number of threads")
         exit(1)
 
-    init_database(args.bypass_checks)
+    # Initialize database and validate
+    async def main():
+        await init_database(args.bypass_checks)
 
-    if os.path.isdir(args.path):
-        logger.info(f"{args.path} is a directory")
-        asyncio.run(scan_dir(args.path, args.num_threads, args.mode, asyncio.Semaphore(args.num_threads)))
-    elif os.path.isfile(args.path): # One file, one thread. Get it over with.
-        logger.info(f"{args.path} is a file")
-        asyncio.run(scan_file(args.path, args.mode, asyncio.Semaphore(1)))
-    else: # Either invalid, or something like a symlink
-        logger.error(f"{args.path} is not a directory or file")
-        print('Invalid path')
+        if os.path.isdir(args.path):
+            logger.info(f"{args.path} is a directory")
+            await scan_dir(args.path, args.num_threads, args.mode, asyncio.Semaphore(args.num_threads))
+        elif os.path.isfile(args.path):  # One file, one thread
+            logger.info(f"{args.path} is a file")
+            await scan_file(args.path, args.mode, asyncio.Semaphore(1))
+        else:  # Invalid path
+            logger.error(f"{args.path} is not a directory or file")
+            print('Invalid path')
+
+    asyncio.run(main())
