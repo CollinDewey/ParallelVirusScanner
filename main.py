@@ -3,6 +3,9 @@ import asyncio
 import aiofiles
 import logging
 import os
+import zipfile
+import shutil
+import tempfile
 from db import init_database
 from scan import md5_scan
 
@@ -10,12 +13,40 @@ logger = logging.getLogger(__name__)
 
 async def scan_dir(path, num_threads, mode, semaphore):
     tasks = []
+    tmp_dir = tempfile.mkdtemp()
+    scan_tmp = False
 
     for root, dirs, files in os.walk(path):
         for file in files:
-            tasks.append(asyncio.create_task(scan_file(os.path.join(root, file), mode, semaphore)))
+
+            if zipfile.is_zipfile(os.path.join(root, file)):
+                    try:
+                        logger.info(f"Detected ZIP file: {os.path.join(root, file)}")
+                        # Save the ZIP file to the TMP directory
+                        with zipfile.ZipFile(os.path.join(root, file), 'r') as zip_ref:
+                            tmp_zip_path = os.path.join(tmp_dir, os.path.basename(file))
+                            logger.info(f"Extracting ZIP file: {os.path.join(root, file)} into TMP directory")
+                            zip_ref.extractall(tmp_zip_path)
+                        logger.info(f"Extraction complete for: {os.path.join(root, file)}")
+                        scan_tmp = True
+                    except Exception as e:
+                        logger.error(f"Error processing ZIP file: {os.path.join(root, file)}. Exception: {e}")
+            else:
+                tasks.append(asyncio.create_task(scan_file(os.path.join(root, file), mode, semaphore)))
     
+    if scan_tmp:
+        logger.info(f"Scanning {tmp_dir}")
+        await scan_dir(tmp_dir, num_threads, mode, semaphore)
+
     await asyncio.gather(*tasks)
+
+    if scan_tmp:
+        try:
+            shutil.rmtree(tmp_dir)
+            logger.info(f"Deleted TMP directory: {tmp_dir}")
+        except Exception as e:
+            logger.error(f"Error deleting TMP directory: {e}")
+
 
 async def scan_file(path, mode, semaphore):
     async with semaphore:
