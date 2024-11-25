@@ -1,4 +1,3 @@
-requests
 aiosqlite
 aiofiles
 aiohttp
