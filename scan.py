@@ -21,7 +21,7 @@ async def md5_scan(path, pool):
     else:
         hasher = hashlib.md5()
         with aiofiles.open(path, "rb") as file:
-            while chunk := file.read(16384):
+            while chunk := await file.read(16384):
                 hasher.update(chunk)
         hash = hasher.hexdigest()
 
