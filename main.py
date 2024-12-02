@@ -1,6 +1,6 @@
 import argparse
+import concurrent.futures
 import asyncio
-import aiofiles
 import logging
 import os
 import zipfile
@@ -35,6 +35,7 @@ async def scan_dir_with_block(path, num_threads, mode, semaphore, true_path):
     tasks = []
     tmp_dir = tempfile.mkdtemp()
     scan_tmp = False
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=num_threads)
 
     for root, dirs, files in os.walk(path):
         for file in files:
@@ -45,7 +46,7 @@ async def scan_dir_with_block(path, num_threads, mode, semaphore, true_path):
                 if scan_tmp == False and is_extracted == True:
                     scan_tmp = True
             else:
-                tasks.append(asyncio.create_task(scan_file(os.path.join(root, file), mode, semaphore, true_path)))
+                tasks.append(asyncio.create_task(scan_file(os.path.join(root, file), mode, semaphore, pool, true_path)))
     
     if scan_tmp:
         logger.info(f"Scanning extracted files in TMP directory: {tmp_dir}")
@@ -88,8 +89,9 @@ async def scan_dir_with_cycle_scheduling(path, num_threads, mode, true_path):
 
     # Run tasks for each worker
     semaphores = [asyncio.Semaphore(1) for _ in range(num_threads)]
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=num_threads)
     worker_tasks = [
-        asyncio.create_task(scan_worker(tasks, mode, semaphores[i], true_path))
+        asyncio.create_task(scan_worker(tasks, mode, semaphores[i], pool, true_path))
         for i, tasks in tasks_per_worker.items()
     ]
     await asyncio.gather(*worker_tasks)
@@ -104,29 +106,28 @@ async def scan_dir_with_cycle_scheduling(path, num_threads, mode, true_path):
 
 #################################################################
 ## Worker to process a list of files
-async def scan_worker(tasks, mode, semaphore, true_path):
+async def scan_worker(tasks, mode, semaphore, pool, true_path):
     for task in tasks:
-        await scan_file(task, mode, semaphore, true_path)
+        await scan_file(task, mode, semaphore, pool, true_path)
 
 
 #################################################################
 ## Scans a file for a virus using a database of md5 hashes
-async def scan_file(path, mode, semaphore, true_path):
+async def scan_file(path, mode, semaphore, pool, true_path):
     async with semaphore:
         logger.info(f"Scanning file: {path}")
         try:
             if os.path.isfile(path):
-                async with aiofiles.open(path, "rb") as file:
-                    match mode.lower():
-                        case 'dir':
-                            if await md5_scan(file):
-                                print(f"Virus found inside directory \"{true_path}\": {os.path.basename(path)}")
-                        case 'zip':
-                            if await md5_scan(file):
-                                print(f"Virus found inside zip file \"{true_path}\": {os.path.basename(path)}")
-                        case 'file':
-                            if await md5_scan(file):
-                                print(f"Virus found: {true_path}")
+                match mode.lower():
+                    case 'dir':
+                        if await md5_scan(path, pool):
+                            print(f"Virus found inside directory \"{true_path}\": {os.path.basename(path)}")
+                    case 'zip':
+                        if await md5_scan(path, pool):
+                            print(f"Virus found inside zip file \"{true_path}\": {os.path.basename(path)}")
+                    case 'file':
+                        if await md5_scan(path, pool):
+                            print(f"Virus found: {true_path}")
         except Exception as e:
             logger.error(f"Error scanning file {path}: {str(e)}") # Permissions probably
 
@@ -192,7 +193,7 @@ if __name__ == '__main__':
         # If path is an individual file
         elif os.path.isfile(args.path):
             logger.info(f"{args.path} is a file")
-            await scan_file(args.path, 'file', asyncio.Semaphore(1), args.path)
+            await scan_file(args.path, 'file', asyncio.Semaphore(1), None, args.path)
 
         # If path is invalid
         else:
