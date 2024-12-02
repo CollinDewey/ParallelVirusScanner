@@ -1,4 +1,5 @@
 import aiosqlite
+import aiofiles
 import asyncio
 import logging
 import hashlib
@@ -15,15 +16,15 @@ def md5_hasher_worker(path):
     return hasher.hexdigest()
 
 async def md5_scan(path, pool):
-    # Use real multi-threads if available. This violently kills performance. Kek.
     if pool is not None:
         hash = await asyncio.get_running_loop().run_in_executor(pool, md5_hasher_worker, path)
     else:
         hasher = hashlib.md5()
-        with open(path, "rb") as file:
-            while chunk := await file.read(16384):
+        with aiofiles.open(path, "rb") as file:
+            while chunk := file.read(16384):
                 hasher.update(chunk)
-            hash = hasher.hexdigest()
+        hash = hasher.hexdigest()
+
     logger.info(f"Hash: {hash}")
 
     async with aiosqlite.connect(db_path) as db:
