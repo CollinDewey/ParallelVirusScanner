@@ -137,6 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_threads', type=int, default=os.cpu_count(), help='Number of threads')
     parser.add_argument('--verbose', action='store_true', help='Set verbose mode')
     parser.add_argument('--bypass_checks', action='store_true', help='Bypasses validation checks')
+    parser.add_argument('--no_thread_creation', action='store_true', help='Use one OS thread')
     parser.add_argument('--scheduling', type=str, default='block', choices=['block', 'cycle'], help='Scheduling Type')
 
 
@@ -155,7 +156,7 @@ if __name__ == '__main__':
     async def main():
         await init_database(args.bypass_checks)
         logger.info(f"using {args.num_threads} threads")
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=args.num_threads)
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=args.num_threads) if not args.no_thread_creation else None
 
 
         # If path is a directory

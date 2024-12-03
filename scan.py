@@ -1,5 +1,4 @@
 import aiosqlite
-import aiofiles
 import asyncio
 import logging
 import hashlib
@@ -19,11 +18,7 @@ async def md5_scan(path, pool):
     if pool is not None:
         hash = await asyncio.get_running_loop().run_in_executor(pool, md5_hasher_worker, path)
     else:
-        hasher = hashlib.md5()
-        with aiofiles.open(path, "rb") as file:
-            while chunk := await file.read(16384):
-                hasher.update(chunk)
-        hash = hasher.hexdigest()
+        hash = md5_hasher_worker(path)
 
     logger.info(f"Hash: {hash}")
 

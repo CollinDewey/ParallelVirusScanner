@@ -10,15 +10,16 @@ On first startup, it downloads and builds a SQLlite definitions.db file. This ta
 Use the EICAR test file for testing.
 
 ```sh
-python main.py [-h] [--num_threads NUM_THREADS] [--mode {all,md5}] [--verbose] [--bypass_checks] path
+usage: main.py [-h] [--num_threads NUM_THREADS] [--verbose] [--bypass_checks] [--no_thread_creation] [--scheduling {block,cycle}] path
 
 positional arguments:
   path                  Path to the file or directory to scan
 
 options:
-  -h, --help                show this help message and exit
-  --num_threads NUM_THREADS Number of threads
-  --mode {all,md5,zip}      Scan Mode
-  --verbose                 Set verbose mode
-  --bypass_checks           Bypasses validation checks
+  -h, --help                  show this help message and exit
+  --num_threads NUM_THREADS   Number of threads
+  --verbose                   Set verbose mode
+  --bypass_checks             Bypasses validation checks
+  --no_thread_creation        Use one OS thread
+  --scheduling {block,cycle}  Scheduling Type
 ```
