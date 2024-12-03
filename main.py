@@ -31,10 +31,13 @@ def extract_zip(zip_path, tmp_dir):
 
 #################################################################
 ## Scans Directory with Block Scheduling
-async def scan_dir_with_block(path, num_threads, mode, semaphore, true_path, pool):
+async def scan_dir_with_block(path, num_threads, mode, semaphore, pool, base_path = None):
     tasks = []
     tmp_dir = tempfile.mkdtemp()
     scan_tmp = False
+
+    if base_path == None:
+        base_path = path
 
     for root, dirs, files in os.walk(path):
         for file in files:
@@ -45,11 +48,12 @@ async def scan_dir_with_block(path, num_threads, mode, semaphore, true_path, poo
                 if scan_tmp == False and is_extracted == True:
                     scan_tmp = True
             else:
-                tasks.append(asyncio.create_task(scan_file(os.path.join(root, file), mode, semaphore, pool, true_path)))
+                true_path = os.path.join(root, file).replace(path, '')[1:]
+                tasks.append(asyncio.create_task(scan_file(os.path.join(root, file), mode, semaphore, pool, base_path, true_path)))
     
     if scan_tmp:
         logger.info(f"Scanning extracted files in TMP directory: {tmp_dir}")
-        await scan_dir_with_block(tmp_dir, num_threads, mode, semaphore, true_path, pool)
+        await scan_dir_with_block(tmp_dir, num_threads, mode, semaphore, pool, base_path)
 
     await asyncio.gather(*tasks)
 
@@ -63,9 +67,12 @@ async def scan_dir_with_block(path, num_threads, mode, semaphore, true_path, poo
 
 #################################################################
 ## Scans Directory with Cycle Scheduling
-async def scan_dir_with_cycle_scheduling(path, num_threads, mode, true_path, pool):
+async def scan_dir_with_cycle_scheduling(path, num_threads, mode, pool, base_path = None):
     tmp_dir = tempfile.mkdtemp()
     scan_tmp = False
+
+    if base_path == None:
+        base_path = path
 
     # Prep for cycle scheduling
     tasks_per_worker = {i: [] for i in range(num_threads)}
@@ -79,17 +86,18 @@ async def scan_dir_with_cycle_scheduling(path, num_threads, mode, true_path, poo
                 if scan_tmp == False and is_extracted == True:
                     scan_tmp = True
             else:
+                true_path = os.path.join(root, file).replace(path, '')[1:]
                 worker_id = next(workers)  # Assign task to the next worker in cycle
-                tasks_per_worker[worker_id].append(os.path.join(root, file))
+                tasks_per_worker[worker_id].append((os.path.join(root, file), true_path))
 
     if scan_tmp:
         logger.info(f"Scanning extracted files in TMP directory: {tmp_dir}")
-        await scan_dir_with_cycle_scheduling(tmp_dir, num_threads, mode, true_path, pool)
+        await scan_dir_with_cycle_scheduling(tmp_dir, num_threads, mode, pool, base_path)
 
     # Run tasks for each worker
     semaphores = [asyncio.Semaphore(1) for _ in range(num_threads)]
     worker_tasks = [
-        asyncio.create_task(scan_worker(tasks, mode, semaphores[i], pool, true_path))
+        asyncio.create_task(scan_worker(tasks, mode, semaphores[i], pool, base_path))
         for i, tasks in tasks_per_worker.items()
     ]
     await asyncio.gather(*worker_tasks)
@@ -104,14 +112,19 @@ async def scan_dir_with_cycle_scheduling(path, num_threads, mode, true_path, poo
 
 #################################################################
 ## Worker to process a list of files
-async def scan_worker(tasks, mode, semaphore, pool, true_path):
+async def scan_worker(tasks, mode, semaphore, pool, base_path):
     for task in tasks:
-        await scan_file(task, mode, semaphore, pool, true_path)
+        await scan_file(task[0], mode, semaphore, pool, base_path, task[1])
 
 
 #################################################################
 ## Scans a file for a virus using a database of md5 hashes
-async def scan_file(path, mode, semaphore, pool, true_path):
+async def scan_file(path, mode, semaphore, pool, base_path = None, true_path = None):
+    if base_path == None:
+        base_path = path
+    if true_path == None:
+        true_path = path
+    
     async with semaphore:
         logger.info(f"Scanning file: {path}")
         try:
@@ -119,10 +132,10 @@ async def scan_file(path, mode, semaphore, pool, true_path):
                 match mode.lower():
                     case 'dir':
                         if await md5_scan(path, pool):
-                            print(f"Virus found inside directory \"{true_path}\": {os.path.basename(path)}")
+                            print(f"Virus found inside directory \"{base_path}\": {true_path}")
                     case 'zip':
                         if await md5_scan(path, pool):
-                            print(f"Virus found inside zip file \"{true_path}\": {os.path.basename(path)}")
+                            print(f"Virus found inside zip file \"{base_path}\": {true_path}")
                     case 'file':
                         if await md5_scan(path, pool):
                             print(f"Virus found: {true_path}")
@@ -164,10 +177,10 @@ if __name__ == '__main__':
             logger.info(f"{args.path} is a directory")
             if args.scheduling == "block":
                 logger.info(f"using block scheduling")
-                await scan_dir_with_block(args.path, args.num_threads, 'dir', asyncio.Semaphore(args.num_threads), args.path, pool)
+                await scan_dir_with_block(args.path, args.num_threads, 'dir', asyncio.Semaphore(args.num_threads), pool)
             else:
                 logger.info(f"using cycle scheduling")
-                await scan_dir_with_cycle_scheduling(args.path, args.num_threads, 'dir', args.path, pool)
+                await scan_dir_with_cycle_scheduling(args.path, args.num_threads, 'dir', pool)
 
         # If path is a zip file
         elif zipfile.is_zipfile(args.path):
@@ -180,10 +193,10 @@ if __name__ == '__main__':
                 
                 if args.scheduling == "block":
                     logger.info(f"using block scheduling")
-                    await scan_dir_with_block(tmp_dir, args.num_threads, 'zip', asyncio.Semaphore(args.num_threads), args.path, pool)
+                    await scan_dir_with_block(tmp_dir, args.num_threads, 'zip', asyncio.Semaphore(args.num_threads), pool, args.path)
                 else:
                     logger.info(f"using cycle scheduling")
-                    await scan_dir_with_cycle_scheduling(tmp_dir, args.num_threads, 'zip', args.path, pool)
+                    await scan_dir_with_cycle_scheduling(tmp_dir, args.num_threads, 'zip', pool, args.path)
 
                 try:
                     shutil.rmtree(tmp_dir)
@@ -194,7 +207,7 @@ if __name__ == '__main__':
         # If path is an individual file
         elif os.path.isfile(args.path):
             logger.info(f"{args.path} is a file")
-            await scan_file(args.path, 'file', asyncio.Semaphore(1), None, args.path)
+            await scan_file(args.path, 'file', asyncio.Semaphore(1), None)
 
         # If path is invalid
         else:

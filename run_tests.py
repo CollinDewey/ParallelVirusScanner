@@ -3,6 +3,7 @@ import time
 import subprocess
 import matplotlib.pyplot as plt
 import numpy as np
+import re
 
 def benchmark_folder(folder_path):
     results = {'block': {}, 'cycle': {}}
@@ -34,7 +35,7 @@ def main():
     
     for folder in os.listdir(tests_dir):
         folder_path = os.path.join(tests_dir, folder)
-        if os.path.isdir(folder_path):
+        if os.path.isdir(folder_path) and re.match('\\d{,4}_\\d{,4}M', folder) is not None:
             print(f"\nBenchmarking {folder}...")
             results = benchmark_folder(folder_path)
             all_results[folder] = results
