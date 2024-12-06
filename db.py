@@ -84,10 +84,10 @@ async def init_database(bypass_checks):
         return
 
     if not await validate_database():
-        print("Downloading database (1.8GB)...\nThis will take some time.", end="", flush=True)
+        print("Downloading database...\nThis will take some time.", end="", flush=True)
         await download_database()
         if await validate_database():
             print("\nDatabase downloaded.")
         else:
             print("\nDownload failed.\nRetrying...")
-            #await init_database(False)
+            await init_database(False)

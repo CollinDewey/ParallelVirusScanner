@@ -1,13 +1,28 @@
 # ParallelVirusScanner
 
+
+## Installing
+
+To run, you'll need Python 3.
+
 Install Dependencies with pip
 ```
 pip install -r requirements.txt
 ```
 
-On first startup, it downloads and builds a SQLlite definitions.db file. This takes a while to download.
+On first startup, it downloads and builds a SQLlite definitions.db file. This takes a while to download and process.
 
-Use the EICAR test file for testing.
+## Testing
+
+The [EICAR](https://www.eicar.org/download-anti-malware-testfile/) test file can be used for testing a correct identification, without placing malicious code on your computer.
+
+To use, run the main.py with python and a file path through the command line. (Works on Windows, macOS, Linux)
+
+```sh
+python.exe main.py <filename or file path>
+```
+
+## Usage
 
 ```sh
 usage: main.py [-h] [--num_threads NUM_THREADS] [--verbose] [--bypass_checks] [--no_thread_creation] [--scheduling {block,cycle}] path
