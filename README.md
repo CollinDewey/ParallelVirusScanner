@@ -1,5 +1,6 @@
 # ParallelVirusScanner
 
+Simple parallelized and multi-threaded MD5 virus scanner with block/cycle scheduling and PKZIP handling.
 
 ## Installing
 
@@ -19,7 +20,7 @@ The [EICAR](https://www.eicar.org/download-anti-malware-testfile/) test file can
 To use, run the main.py with python and a file path through the command line. (Works on Windows, macOS, Linux)
 
 ```sh
-python.exe main.py <filename or file path>
+python main.py <filename or file path>
 ```
 
 ## Usage
@@ -38,3 +39,6 @@ options:
   --no_thread_creation        Use one OS thread
   --scheduling {block,cycle}  Scheduling Type
 ```
+## Contributers
+
+This was a class final project for a Parallel Programming course. Created by Collin Dewey, Matthew Hood, and Joshua Johnson.
